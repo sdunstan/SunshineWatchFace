@@ -31,11 +31,11 @@ import android.os.Handler;
 import android.os.Message;
 import android.support.wearable.watchface.CanvasWatchFaceService;
 import android.support.wearable.watchface.WatchFaceStyle;
-import android.text.format.Time;
 import android.view.SurfaceHolder;
 import android.view.WindowInsets;
 
 import java.lang.ref.WeakReference;
+import java.util.GregorianCalendar;
 import java.util.TimeZone;
 import java.util.concurrent.TimeUnit;
 
@@ -89,16 +89,20 @@ public class SunshineWatchFace extends CanvasWatchFaceService {
         Paint mBackgroundPaint;
         Paint mTextPaint;
         boolean mAmbient;
-        Time mTime;
+        GregorianCalendar mTime;
+        float mXOffset;
+        float mYOffset;
+
         final BroadcastReceiver mTimeZoneReceiver = new BroadcastReceiver() {
             @Override
             public void onReceive(Context context, Intent intent) {
-                mTime.clear(intent.getStringExtra("time-zone"));
-                mTime.setToNow();
+                // see: http://developer.android.com/reference/android/content/Intent.html#ACTION_TIMEZONE_CHANGED
+                String timeZoneId = intent.getStringExtra("time-zone");
+                if (timeZoneId != null) {
+                    mTime = new GregorianCalendar(TimeZone.getTimeZone(timeZoneId));
+                }
             }
         };
-        float mXOffset;
-        float mYOffset;
 
         /**
          * Whether the display supports fewer bits for each color in ambient mode. When true, we
@@ -124,7 +128,7 @@ public class SunshineWatchFace extends CanvasWatchFaceService {
             mTextPaint = new Paint();
             mTextPaint = createTextPaint(resources.getColor(R.color.digital_text));
 
-            mTime = new Time();
+            mTime = new GregorianCalendar();
         }
 
         @Override
@@ -149,8 +153,7 @@ public class SunshineWatchFace extends CanvasWatchFaceService {
                 registerReceiver();
 
                 // Update time zone in case it changed while we weren't visible.
-                mTime.clear(TimeZone.getDefault().getID());
-                mTime.setToNow();
+                mTime = new GregorianCalendar(TimeZone.getDefault());
             } else {
                 unregisterReceiver();
             }
@@ -230,11 +233,21 @@ public class SunshineWatchFace extends CanvasWatchFaceService {
             }
 
             // Draw H:MM in ambient mode or H:MM:SS in interactive mode.
-            mTime.setToNow();
+            mTime.setTime(new java.util.Date());
             String text = mAmbient
-                    ? String.format("%d:%02d", mTime.hour, mTime.minute)
-                    : String.format("%d:%02d:%02d", mTime.hour, mTime.minute, mTime.second);
+                    ? String.format("%d:%02d",
+                            getHour(),
+                            mTime.get(GregorianCalendar.MINUTE))
+                    : String.format("%d:%02d:%02d",
+                            getHour(),
+                            mTime.get(GregorianCalendar.MINUTE),
+                            mTime.get(GregorianCalendar.SECOND));
             canvas.drawText(text, mXOffset, mYOffset, mTextPaint);
+        }
+
+        private int getHour() {
+            int hour = mTime.get(GregorianCalendar.HOUR);
+            return (hour == 0) ? 12 : hour;
         }
 
         /**
