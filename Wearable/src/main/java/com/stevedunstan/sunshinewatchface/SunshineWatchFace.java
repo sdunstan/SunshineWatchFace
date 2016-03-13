@@ -22,10 +22,8 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.res.Resources;
 import android.graphics.Canvas;
-import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.Rect;
-import android.graphics.Typeface;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Message;
@@ -44,8 +42,6 @@ import java.util.concurrent.TimeUnit;
  * low-bit ambient mode, the text is drawn without anti-aliasing in ambient mode.
  */
 public class SunshineWatchFace extends CanvasWatchFaceService {
-    private static final Typeface NORMAL_TYPEFACE =
-            Typeface.create(Typeface.SANS_SERIF, Typeface.NORMAL);
 
     /**
      * Update rate in milliseconds for interactive mode. We update once a second since seconds are
@@ -86,12 +82,10 @@ public class SunshineWatchFace extends CanvasWatchFaceService {
     private class Engine extends CanvasWatchFaceService.Engine {
         final Handler mUpdateTimeHandler = new EngineHandler(this);
         boolean mRegisteredTimeZoneReceiver = false;
-        Paint mBackgroundPaint;
         Paint mTextPaint;
         boolean mAmbient;
         GregorianCalendar mTime;
-        float mXOffset;
-        float mYOffset;
+        SunshineSurfacePainter sunshineSurfacePainter;
 
         final BroadcastReceiver mTimeZoneReceiver = new BroadcastReceiver() {
             @Override
@@ -120,13 +114,8 @@ public class SunshineWatchFace extends CanvasWatchFaceService {
                     .setShowSystemUiTime(false)
                     .build());
             Resources resources = SunshineWatchFace.this.getResources();
-            mYOffset = resources.getDimension(R.dimen.digital_y_offset);
+            sunshineSurfacePainter = new SunshineSurfacePainter(SunshineWatchFace.this);
 
-            mBackgroundPaint = new Paint();
-            mBackgroundPaint.setColor(resources.getColor(R.color.background));
-
-            mTextPaint = new Paint();
-            mTextPaint = createTextPaint(resources.getColor(R.color.digital_text));
 
             mTime = new GregorianCalendar();
         }
@@ -135,14 +124,6 @@ public class SunshineWatchFace extends CanvasWatchFaceService {
         public void onDestroy() {
             mUpdateTimeHandler.removeMessages(MSG_UPDATE_TIME);
             super.onDestroy();
-        }
-
-        private Paint createTextPaint(int textColor) {
-            Paint paint = new Paint();
-            paint.setColor(textColor);
-            paint.setTypeface(NORMAL_TYPEFACE);
-            paint.setAntiAlias(true);
-            return paint;
         }
 
         @Override
@@ -186,13 +167,7 @@ public class SunshineWatchFace extends CanvasWatchFaceService {
 
             // Load resources that have alternate values for round watches.
             Resources resources = SunshineWatchFace.this.getResources();
-            boolean isRound = insets.isRound();
-            mXOffset = resources.getDimension(isRound
-                    ? R.dimen.digital_x_offset_round : R.dimen.digital_x_offset);
-            float textSize = resources.getDimension(isRound
-                    ? R.dimen.digital_text_size_round : R.dimen.digital_text_size);
-
-            mTextPaint.setTextSize(textSize);
+            sunshineSurfacePainter.applyInsets(insets);
         }
 
         @Override
@@ -225,29 +200,8 @@ public class SunshineWatchFace extends CanvasWatchFaceService {
 
         @Override
         public void onDraw(Canvas canvas, Rect bounds) {
-            // Draw the background.
-            if (isInAmbientMode()) {
-                canvas.drawColor(Color.BLACK);
-            } else {
-                canvas.drawRect(0, 0, bounds.width(), bounds.height(), mBackgroundPaint);
-            }
-
-            // Draw H:MM in ambient mode or H:MM:SS in interactive mode.
-            mTime.setTime(new java.util.Date());
-            String text = mAmbient
-                    ? String.format("%d:%02d",
-                            getHour(),
-                            mTime.get(GregorianCalendar.MINUTE))
-                    : String.format("%d:%02d:%02d",
-                            getHour(),
-                            mTime.get(GregorianCalendar.MINUTE),
-                            mTime.get(GregorianCalendar.SECOND));
-            canvas.drawText(text, mXOffset, mYOffset, mTextPaint);
-        }
-
-        private int getHour() {
-            int hour = mTime.get(GregorianCalendar.HOUR);
-            return (hour == 0) ? 12 : hour;
+            WeatherState weatherState = new WeatherState(SunshineWatchFace.this);
+            sunshineSurfacePainter.paint(isInAmbientMode(), weatherState, canvas, bounds, mTime);
         }
 
         /**
