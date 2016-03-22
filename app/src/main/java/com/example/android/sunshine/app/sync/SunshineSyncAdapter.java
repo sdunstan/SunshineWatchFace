@@ -63,6 +63,8 @@ public class SunshineSyncAdapter extends AbstractThreadedSyncAdapter {
     private static final long DAY_IN_MILLIS = 1000 * 60 * 60 * 24;
     private static final int WEATHER_NOTIFICATION_ID = 3004;
 
+    private WearableDataSender wearableDataSender;
+
 
     private static final String[] NOTIFY_WEATHER_PROJECTION = new String[] {
             WeatherContract.WeatherEntry.COLUMN_WEATHER_ID,
@@ -89,6 +91,7 @@ public class SunshineSyncAdapter extends AbstractThreadedSyncAdapter {
 
     public SunshineSyncAdapter(Context context, boolean autoInitialize) {
         super(context, autoInitialize);
+        wearableDataSender = new WearableDataSender(context);
     }
 
     @Override
@@ -409,7 +412,7 @@ public class SunshineSyncAdapter extends AbstractThreadedSyncAdapter {
         if ( displayNotifications ) {
 
             String lastNotificationKey = context.getString(R.string.pref_last_notification);
-            long lastSync = prefs.getLong(lastNotificationKey, 0);
+            long lastSync = 0; // get rid of this for debugging...  prefs.getLong(lastNotificationKey, 0);
 
             if (System.currentTimeMillis() - lastSync >= DAY_IN_MILLIS) {
                 // Last sync was more than 1 day ago, let's send a notification with the weather.
@@ -455,6 +458,11 @@ public class SunshineSyncAdapter extends AbstractThreadedSyncAdapter {
                         Log.e(LOG_TAG, "Error retrieving large icon from " + artUrl, e);
                         largeIcon = BitmapFactory.decodeResource(resources, artResourceId);
                     }
+
+                    // Update the wearable
+                    Log.i("SunshineWatchFace", "Sending weather data to wearable: " + high);
+                    wearableDataSender.sendWeatherData(high, low, largeIcon);
+
                     String title = context.getString(R.string.app_name);
 
                     // Define the text of the forecast.

@@ -29,6 +29,7 @@ import android.os.Handler;
 import android.os.Message;
 import android.support.wearable.watchface.CanvasWatchFaceService;
 import android.support.wearable.watchface.WatchFaceStyle;
+import android.util.Log;
 import android.view.SurfaceHolder;
 import android.view.WindowInsets;
 
@@ -42,7 +43,6 @@ import java.util.concurrent.TimeUnit;
  * low-bit ambient mode, the text is drawn without anti-aliasing in ambient mode.
  */
 public class SunshineWatchFace extends CanvasWatchFaceService {
-
     /**
      * Update rate in milliseconds for interactive mode. We update once a second since seconds are
      * displayed in interactive mode.
@@ -79,13 +79,15 @@ public class SunshineWatchFace extends CanvasWatchFaceService {
         }
     }
 
-    private class Engine extends CanvasWatchFaceService.Engine {
+    private class Engine extends CanvasWatchFaceService.Engine  {
         final Handler mUpdateTimeHandler = new EngineHandler(this);
-        boolean mRegisteredTimeZoneReceiver = false;
+        boolean mRegisteredReceivers = false;
         Paint mTextPaint;
         boolean mAmbient;
         GregorianCalendar mTime;
-        SunshineSurfacePainter sunshineSurfacePainter;
+        double highTemp;
+        double lowTemp;
+        private SunshineSurfacePainter sunshineSurfacePainter;
 
         final BroadcastReceiver mTimeZoneReceiver = new BroadcastReceiver() {
             @Override
@@ -95,6 +97,15 @@ public class SunshineWatchFace extends CanvasWatchFaceService {
                 if (timeZoneId != null) {
                     mTime = new GregorianCalendar(TimeZone.getTimeZone(timeZoneId));
                 }
+            }
+        };
+
+        final BroadcastReceiver mSunshineDataReciever = new BroadcastReceiver() {
+            @Override
+            public void onReceive(Context context, Intent intent) {
+                Log.i("SunshineWatchFace", "Reieved local sunshine data in broadcast reciever");
+                highTemp = intent.getDoubleExtra("high-temp", Double.MAX_VALUE);
+                lowTemp = intent.getDoubleExtra("low-temp", 0.0);
             }
         };
 
@@ -145,20 +156,27 @@ public class SunshineWatchFace extends CanvasWatchFaceService {
         }
 
         private void registerReceiver() {
-            if (mRegisteredTimeZoneReceiver) {
+            if (mRegisteredReceivers) {
                 return;
             }
-            mRegisteredTimeZoneReceiver = true;
+
+            mRegisteredReceivers = true;
+
             IntentFilter filter = new IntentFilter(Intent.ACTION_TIMEZONE_CHANGED);
             SunshineWatchFace.this.registerReceiver(mTimeZoneReceiver, filter);
+
+            IntentFilter sunshineDataFilter = new IntentFilter("sunshine-data-event");
+            SunshineWatchFace.this.registerReceiver(mSunshineDataReciever, sunshineDataFilter);
+
         }
 
         private void unregisterReceiver() {
-            if (!mRegisteredTimeZoneReceiver) {
+            if (!mRegisteredReceivers) {
                 return;
             }
-            mRegisteredTimeZoneReceiver = false;
+            mRegisteredReceivers = false;
             SunshineWatchFace.this.unregisterReceiver(mTimeZoneReceiver);
+            SunshineWatchFace.this.unregisterReceiver(mSunshineDataReciever);
         }
 
         @Override
@@ -187,7 +205,7 @@ public class SunshineWatchFace extends CanvasWatchFaceService {
             super.onAmbientModeChanged(inAmbientMode);
             if (mAmbient != inAmbientMode) {
                 mAmbient = inAmbientMode;
-                if (mLowBitAmbient) {
+                if (mLowBitAmbient && mTextPaint != null) {
                     mTextPaint.setAntiAlias(!inAmbientMode);
                 }
                 invalidate();
@@ -200,7 +218,7 @@ public class SunshineWatchFace extends CanvasWatchFaceService {
 
         @Override
         public void onDraw(Canvas canvas, Rect bounds) {
-            WeatherState weatherState = new WeatherState(SunshineWatchFace.this);
+            WeatherState weatherState = new WeatherState(SunshineWatchFace.this, 99.0, 0.0, null);
             sunshineSurfacePainter.paint(isInAmbientMode(), weatherState, canvas, bounds, mTime);
         }
 
@@ -235,5 +253,6 @@ public class SunshineWatchFace extends CanvasWatchFaceService {
                 mUpdateTimeHandler.sendEmptyMessageDelayed(MSG_UPDATE_TIME, delayMs);
             }
         }
+
     }
 }
