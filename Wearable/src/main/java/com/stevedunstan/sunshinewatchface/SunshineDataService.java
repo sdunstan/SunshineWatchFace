@@ -25,7 +25,7 @@ public class SunshineDataService extends WearableListenerService {
                     DataMap dataMap = DataMapItem.fromDataItem(dataItem).getDataMap();
                     double highTemp = dataMap.getDouble("high-temp");
                     double lowTemp = dataMap.getDouble("low-temp");
-                    Asset weatherIconAsset = dataMap.getAsset("weather-icon");
+                    Asset weatherIconAsset = null; // dataMap.getAsset("weather-icon");
                     Log.i("SunshineDataService", "High temp is " + highTemp);
                     sendData(highTemp, lowTemp, weatherIconAsset);
                 }
@@ -37,7 +37,7 @@ public class SunshineDataService extends WearableListenerService {
         Intent sunshineDataIntent = new Intent("sunshine-data-event");
         sunshineDataIntent.putExtra("high-temp", high);
         sunshineDataIntent.putExtra("low-temp", low);
-        sunshineDataIntent.putExtra("image", image);
+//        sunshineDataIntent.putExtra("image", image);
 
         LocalBroadcastManager localBroadcastManager = LocalBroadcastManager.getInstance(this);
         localBroadcastManager.sendBroadcast(sunshineDataIntent);

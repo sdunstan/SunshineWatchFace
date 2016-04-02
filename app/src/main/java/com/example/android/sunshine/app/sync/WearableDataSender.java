@@ -49,7 +49,7 @@ public class WearableDataSender {
         PutDataMapRequest putDataMapRequest = PutDataMapRequest.create("/sunshine-weather");
         putDataMapRequest.getDataMap().putDouble("high-temp", high);
         putDataMapRequest.getDataMap().putDouble("low-temp", low);
-        putDataMapRequest.getDataMap().putAsset("weather-icon", weatherIcon);
+//        putDataMapRequest.getDataMap().putAsset("weather-icon", weatherIcon);
 
         PutDataRequest putDataRequest = putDataMapRequest.asPutDataRequest();
         Wearable.DataApi.putDataItem(googleApiClient, putDataRequest);

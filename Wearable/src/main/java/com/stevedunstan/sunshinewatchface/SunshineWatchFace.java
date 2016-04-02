@@ -33,6 +33,13 @@ import android.util.Log;
 import android.view.SurfaceHolder;
 import android.view.WindowInsets;
 
+import com.google.android.gms.common.ConnectionResult;
+import com.google.android.gms.common.api.GoogleApiClient;
+import com.google.android.gms.wearable.DataApi;
+import com.google.android.gms.wearable.DataEvent;
+import com.google.android.gms.wearable.DataEventBuffer;
+import com.google.android.gms.wearable.Wearable;
+
 import java.lang.ref.WeakReference;
 import java.util.GregorianCalendar;
 import java.util.TimeZone;
@@ -79,7 +86,11 @@ public class SunshineWatchFace extends CanvasWatchFaceService {
         }
     }
 
-    private class Engine extends CanvasWatchFaceService.Engine  {
+    private class Engine extends CanvasWatchFaceService.Engine  implements
+            GoogleApiClient.ConnectionCallbacks, GoogleApiClient.OnConnectionFailedListener,
+            DataApi.DataListener {
+
+
         final Handler mUpdateTimeHandler = new EngineHandler(this);
         boolean mRegisteredReceivers = false;
         Paint mTextPaint;
@@ -115,6 +126,8 @@ public class SunshineWatchFace extends CanvasWatchFaceService {
          */
         boolean mLowBitAmbient;
 
+        private GoogleApiClient mGoogleApiClient;
+
         @Override
         public void onCreate(SurfaceHolder holder) {
             super.onCreate(holder);
@@ -129,6 +142,12 @@ public class SunshineWatchFace extends CanvasWatchFaceService {
 
 
             mTime = new GregorianCalendar();
+
+            mGoogleApiClient = new GoogleApiClient.Builder(SunshineWatchFace.this)
+                    .addConnectionCallbacks(this)
+                    .addOnConnectionFailedListener(this)
+                    .addApi(Wearable.API)
+                    .build();
         }
 
         @Override
@@ -146,8 +165,12 @@ public class SunshineWatchFace extends CanvasWatchFaceService {
 
                 // Update time zone in case it changed while we weren't visible.
                 mTime = new GregorianCalendar(TimeZone.getDefault());
+                mGoogleApiClient.connect();
             } else {
                 unregisterReceiver();
+                if (mGoogleApiClient != null && mGoogleApiClient.isConnected()) {
+                    mGoogleApiClient.disconnect();
+                }
             }
 
             // Whether the timer should be running depends on whether we're visible (as well as
@@ -254,5 +277,36 @@ public class SunshineWatchFace extends CanvasWatchFaceService {
             }
         }
 
+        // Message Listener Stuff Begins
+        @Override
+        public void onConnected(Bundle bundle) {
+            // This happens!
+            Log.i("SunshineWatchFace", "connected to data handler");
+            Wearable.DataApi.addListener(mGoogleApiClient, this);
+        }
+
+        @Override
+        public void onConnectionSuspended(int i) {
+            Log.i("SunshineWatchFace", "suspended to data handler");
+            Wearable.DataApi.removeListener(mGoogleApiClient, this);
+        }
+
+        @Override
+        public void onConnectionFailed(ConnectionResult connectionResult) {
+            Log.i("SunshineWatchFace", "connection failed to data handler");
+            Wearable.DataApi.removeListener(mGoogleApiClient, this);
+        }
+
+        @Override
+        public void onDataChanged(DataEventBuffer dataEventBuffer) {
+            // This never happens :-(
+            Log.i("SunshineWatchFace", "data changed! ");
+
+            for (DataEvent event : dataEventBuffer) {
+                Log.i("SunshineWatchFace", "Data event URI: " + event.getDataItem().getUri());
+            }
+        }
+
+        // Message Listener Stuff Ends
     }
 }

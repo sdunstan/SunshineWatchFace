@@ -21,7 +21,7 @@ public class WeatherState {
         this.lowTemp = lowTemp;
         this.highTemp = highTemp;
         this.weatherIcon = weatherIcon;
-        Log.i("WeatherState", "CREATED WEATHER STATE FOR HIGH TEMP: " + this.highTemp);
+        Log.d("WeatherState", "CREATED WEATHER STATE FOR HIGH TEMP: " + this.highTemp);
     }
 
     public Paint getBackgroundColor() {
