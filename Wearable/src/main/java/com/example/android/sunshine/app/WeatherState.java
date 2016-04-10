@@ -2,19 +2,18 @@ package com.example.android.sunshine.app;
 
 import android.content.Context;
 import android.content.res.Resources;
+import android.graphics.Bitmap;
 import android.graphics.Paint;
 import android.util.Log;
-
-import com.google.android.gms.wearable.Asset;
 
 public class WeatherState {
 
     private Paint backgroundColor;
-    private final double lowTemp;
-    private final double highTemp;
-    private final Asset weatherIcon;
+    private final String lowTemp;
+    private final String highTemp;
+    private final Bitmap weatherIcon;
 
-    public WeatherState(Context ctx, double highTemp, double lowTemp, Asset weatherIcon) {
+    public WeatherState(Context ctx, String highTemp, String lowTemp, Bitmap weatherIcon) {
         Resources resources = ctx.getResources();
         backgroundColor = new Paint();
         backgroundColor.setColor(resources.getColor(R.color.background));
@@ -29,10 +28,13 @@ public class WeatherState {
     }
 
     public String getWeatherString() {
-        if (highTemp > 1000.0)
+        if (highTemp == null)
             return "";
-        return String.format("%5.1f\u00B0 %5.1f\u00B0", highTemp, lowTemp);
+        return String.format("%s\u00B0 %s\u00B0", highTemp, lowTemp);
     }
 
 
+    public Bitmap getIcon() {
+        return weatherIcon;
+    }
 }

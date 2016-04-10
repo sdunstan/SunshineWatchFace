@@ -2,11 +2,13 @@ package com.example.android.sunshine.app;
 
 import android.content.Context;
 import android.content.res.Resources;
+import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.Rect;
 import android.graphics.Typeface;
+import android.util.Log;
 import android.view.WindowInsets;
 
 import java.text.SimpleDateFormat;
@@ -47,7 +49,7 @@ public class SunshineSurfacePainter {
     }
 
     public void paint(boolean isAmbient, WeatherState weather, Canvas canvas, Rect bounds, GregorianCalendar time) {
-        drawBackground(isAmbient, canvas, bounds, weather.getBackgroundColor());
+        drawBackground(isAmbient, canvas, bounds, weather.getBackgroundColor(), weather.getIcon());
 
         time.setTime(new java.util.Date());
 
@@ -75,11 +77,17 @@ public class SunshineSurfacePainter {
         canvas.drawText(weather.getWeatherString(), xOffset, weatherYOffset, textPaint);
     }
 
-    private void drawBackground(boolean isAmbient, Canvas canvas, Rect bounds, Paint activeBackgroundPaint) {
+    private void drawBackground(boolean isAmbient, Canvas canvas, Rect bounds, Paint activeBackgroundPaint, Bitmap backgroundIcon) {
+
         if (isAmbient) {
             canvas.drawColor(Color.BLACK);
         } else {
             canvas.drawRect(0, 0, bounds.width(), bounds.height(), activeBackgroundPaint);
+            if (backgroundIcon != null) {
+                Log.i("SunshineWatchFace", "No background icon!");
+                Rect srcDest = new Rect(0, 0, backgroundIcon.getWidth(), backgroundIcon.getHeight());
+                canvas.drawBitmap(backgroundIcon, srcDest, bounds, activeBackgroundPaint);
+            }
         }
     }
 

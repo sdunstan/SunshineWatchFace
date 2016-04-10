@@ -40,6 +40,7 @@ import com.google.android.gms.common.api.GoogleApiClient;
 import com.google.android.gms.common.api.GoogleApiClient.ConnectionCallbacks;
 import com.google.android.gms.common.api.ResultCallbacks;
 import com.google.android.gms.common.api.Status;
+import com.google.android.gms.wearable.Asset;
 import com.google.android.gms.wearable.DataApi;
 import com.google.android.gms.wearable.DataMap;
 import com.google.android.gms.wearable.PutDataMapRequest;
@@ -51,6 +52,7 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.io.BufferedReader;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -72,9 +74,6 @@ public class SunshineSyncAdapter extends AbstractThreadedSyncAdapter implements 
     private static final long DAY_IN_MILLIS = 1000 * 60 * 60 * 24;
     private static final int WEATHER_NOTIFICATION_ID = 3004;
 
-    private WearableDataSender wearableDataSender;
-
-
     private static final String[] NOTIFY_WEATHER_PROJECTION = new String[] {
             WeatherContract.WeatherEntry.COLUMN_WEATHER_ID,
             WeatherContract.WeatherEntry.COLUMN_MAX_TEMP,
@@ -88,9 +87,39 @@ public class SunshineSyncAdapter extends AbstractThreadedSyncAdapter implements 
     private static final int INDEX_MIN_TEMP = 2;
     private static final int INDEX_SHORT_DESC = 3;
 
+    private String lastLowTemp;
+    private String lastHighTemp;
+    private Asset weatherIcon;
+
     @Override
     public void onConnected(Bundle bundle) {
-        this.sendToWearable(200.0, 12.0);
+        Log.e(LOG_TAG, "Attempting to send data to wearable " + lastHighTemp);
+
+        if (mGoogleApiClient.isConnected()) {
+            PutDataMapRequest mapRequest = PutDataMapRequest.create("/sunshine-weather");
+            DataMap dataMap = mapRequest.getDataMap();
+            dataMap.putString("high-temp", lastHighTemp);
+            dataMap.putString("low-temp", lastLowTemp);
+            dataMap.putAsset("weather-icon", weatherIcon);
+
+            PutDataRequest request = mapRequest.asPutDataRequest();
+
+            Wearable.DataApi.putDataItem(mGoogleApiClient, request)
+                    .setResultCallback(new ResultCallbacks<DataApi.DataItemResult>() {
+                        @Override
+                        public void onSuccess(DataApi.DataItemResult dataItemResult) {
+                            Log.e(LOG_TAG, "Data Sent!");
+                            mGoogleApiClient.disconnect();
+                        }
+
+                        @Override
+                        public void onFailure(Status status) {
+                            Log.e(LOG_TAG, "Data not Sent!");
+                            mGoogleApiClient.disconnect();
+                        }
+                    });
+            Log.i("SunshineSyncAdapter", "SENDING DATA TO WEARABLE: " + lastHighTemp);
+        }
     }
 
     @Override
@@ -112,8 +141,6 @@ public class SunshineSyncAdapter extends AbstractThreadedSyncAdapter implements 
 
     public SunshineSyncAdapter(Context context, boolean autoInitialize) {
         super(context, autoInitialize);
-        wearableDataSender = new WearableDataSender(context);
-
         mGoogleApiClient = new GoogleApiClient.Builder(context)
                 .addApi(Wearable.API)
                 .addConnectionCallbacks(this)
@@ -427,6 +454,12 @@ public class SunshineSyncAdapter extends AbstractThreadedSyncAdapter implements 
         }
     }
 
+    private Asset createAssetFromBitmap(Bitmap bitmap) {
+        ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
+        bitmap.compress(Bitmap.CompressFormat.PNG, 100, byteArrayOutputStream);
+        return Asset.createFromBytes(byteArrayOutputStream.toByteArray());
+    }
+
     private void notifyWeather() {
         Context context = getContext();
         //checking the last update and notify if it' the first of the day
@@ -487,7 +520,10 @@ public class SunshineSyncAdapter extends AbstractThreadedSyncAdapter implements 
 
                     // Update the wearable
                     Log.i("SunshineWatchFace", "Sending weather data to wearable: " + high);
-                    // wearableDataSender.sendWeatherData(high, low, largeIcon);
+
+                    lastHighTemp = Utility.formatTemperature(context, high);
+                    lastLowTemp =  Utility.formatTemperature(context,low);
+                    weatherIcon = createAssetFromBitmap(largeIcon);
                     mGoogleApiClient.connect();
 
                     String title = context.getString(R.string.app_name);
@@ -537,38 +573,6 @@ public class SunshineSyncAdapter extends AbstractThreadedSyncAdapter implements 
                 }
                 cursor.close();
             }
-        }
-    }
-
-    private void sendToWearable(double high, double low) {
-        Log.e(LOG_TAG, "Attempting to send data to wearable " + high);
-
-        if (mGoogleApiClient.isConnected()) {
-            PutDataMapRequest mapRequest = PutDataMapRequest.create("/sunshine-weather");
-            DataMap dataMap = mapRequest.getDataMap();
-            dataMap.putDouble("high-temp", high);
-            dataMap.putDouble("low-temp", low);
-            dataMap.putLong("timestamp", System.currentTimeMillis());
-            mapRequest.setUrgent();
-
-            PutDataRequest request = mapRequest.asPutDataRequest();
-            request.setUrgent();
-
-            Wearable.DataApi.putDataItem(mGoogleApiClient, request)
-                    .setResultCallback(new ResultCallbacks<DataApi.DataItemResult>() {
-                        @Override
-                        public void onSuccess(DataApi.DataItemResult dataItemResult) {
-                            Log.e(LOG_TAG, "Data Sent!");
-                            mGoogleApiClient.disconnect();
-                        }
-
-                        @Override
-                        public void onFailure(Status status) {
-                            Log.e(LOG_TAG, "Data not Sent!");
-                            mGoogleApiClient.disconnect();
-                        }
-                    });
-            Log.i("SunshineSyncAdapter", "SENDING DATA TO WEARABLE: " + high);
         }
     }
 
