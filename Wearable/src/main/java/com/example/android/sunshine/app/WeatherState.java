@@ -1,4 +1,4 @@
-package com.stevedunstan.sunshinewatchface;
+package com.example.android.sunshine.app;
 
 import android.content.Context;
 import android.content.res.Resources;
