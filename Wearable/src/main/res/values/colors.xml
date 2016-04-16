@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <color name="background">#9999ff</color>
-    <color name="digital_text">#ffffff</color>
+    <color name="digital_text">#001e3d</color>
+    <color name="digital_text_ambient">#ffffff</color>
 </resources>

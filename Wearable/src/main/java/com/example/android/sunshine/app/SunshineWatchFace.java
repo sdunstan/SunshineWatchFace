@@ -21,8 +21,6 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.res.Resources;
-import android.graphics.Bitmap;
-import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
 import android.graphics.Paint;
 import android.graphics.Rect;
@@ -45,7 +43,6 @@ import com.google.android.gms.wearable.DataMap;
 import com.google.android.gms.wearable.DataMapItem;
 import com.google.android.gms.wearable.Wearable;
 
-import java.io.InputStream;
 import java.lang.ref.WeakReference;
 import java.util.GregorianCalendar;
 import java.util.TimeZone;
@@ -103,10 +100,9 @@ public class SunshineWatchFace extends CanvasWatchFaceService {
         Paint mTextPaint;
         boolean mAmbient;
         GregorianCalendar mTime;
-        String highTemp = null;
-        String lowTemp =  null;
-        Bitmap weatherIcon = null;
+
         private SunshineSurfacePainter sunshineSurfacePainter;
+        private WeatherState mWeatherState = new WeatherState("#9999ff");
 
         final BroadcastReceiver mTimeZoneReceiver = new BroadcastReceiver() {
             @Override
@@ -136,10 +132,7 @@ public class SunshineWatchFace extends CanvasWatchFaceService {
                     .setBackgroundVisibility(WatchFaceStyle.BACKGROUND_VISIBILITY_INTERRUPTIVE)
                     .setShowSystemUiTime(false)
                     .build());
-            Resources resources = SunshineWatchFace.this.getResources();
             sunshineSurfacePainter = new SunshineSurfacePainter(SunshineWatchFace.this);
-
-
             mTime = new GregorianCalendar();
 
             mGoogleApiClient = new GoogleApiClient.Builder(SunshineWatchFace.this)
@@ -235,29 +228,7 @@ public class SunshineWatchFace extends CanvasWatchFaceService {
 
         @Override
         public void onDraw(Canvas canvas, Rect bounds) {
-            WeatherState weatherState = new WeatherState(SunshineWatchFace.this, highTemp, lowTemp, weatherIcon);
-            sunshineSurfacePainter.paint(isInAmbientMode(), weatherState, canvas, bounds, mTime);
-        }
-
-        public Bitmap loadBitmapFromAsset(Asset asset) {
-            if (asset == null) {
-                return null;
-            }
-            ConnectionResult result = mGoogleApiClient.blockingConnect(TIMEOUT_MS, TimeUnit.MILLISECONDS);
-            if (!result.isSuccess()) {
-                return null;
-            }
-            // convert asset into a file descriptor and block until it's ready
-            InputStream assetInputStream = Wearable.DataApi.getFdForAsset(
-                    mGoogleApiClient, asset).await().getInputStream();
-            mGoogleApiClient.disconnect();
-
-            if (assetInputStream == null) {
-                Log.w("SunshineWatchFace", "Requested an unknown Asset.");
-                return null;
-            }
-            // decode the stream into a bitmap
-            return BitmapFactory.decodeStream(assetInputStream);
+            sunshineSurfacePainter.paint(isInAmbientMode(), mWeatherState, canvas, bounds, mTime);
         }
 
         /**
@@ -320,9 +291,11 @@ public class SunshineWatchFace extends CanvasWatchFaceService {
                 Log.i("SunshineWatchFace", "Data event URI: " + event.getDataItem().getUri().getPath());
                 if (event.getDataItem().getUri().getPath().equals("/sunshine-weather")) {
                     DataMap dataMap = DataMapItem.fromDataItem(event.getDataItem()).getDataMap();
-                    this.highTemp = dataMap.getString("high-temp");
-                    this.lowTemp = dataMap.getString("low-temp");
-                    this.weatherIcon = loadBitmapFromAsset(dataMap.getAsset("weather-icon"));
+
+                    String highTemp = dataMap.getString("high-temp");
+                    String lowTemp = dataMap.getString("low-temp");
+                    Asset weatherIcon = dataMap.getAsset("weather-icon");
+                    mWeatherState = new WeatherState(highTemp, lowTemp, "#9999ff", weatherIcon, new WeakReference<GoogleApiClient>(mGoogleApiClient));
 
                     break;
                 }

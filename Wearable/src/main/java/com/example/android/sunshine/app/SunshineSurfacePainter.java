@@ -8,7 +8,9 @@ import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.Rect;
 import android.graphics.Typeface;
-import android.util.Log;
+import android.graphics.drawable.BitmapDrawable;
+import android.graphics.drawable.Drawable;
+import android.support.v4.content.ContextCompat;
 import android.view.WindowInsets;
 
 import java.text.SimpleDateFormat;
@@ -19,14 +21,16 @@ public class SunshineSurfacePainter {
 
     private float xOffset;
     private float yOffset;
+    private float xCenter;
     private final Paint textPaint;
+    private final Paint ambientTextPaint;
     private final Context ctx;
     private SimpleDateFormat dateFormatter;
     private float timeTextSize;
     private float dateTextSize;
     private float weatherTextSize;
-
-
+    private boolean isRound = false;
+    private Bitmap defaultBackgroundIcon;
 
     public SunshineSurfacePainter(Context ctx) {
         this.ctx = ctx;
@@ -34,12 +38,17 @@ public class SunshineSurfacePainter {
         this.xOffset = 0.0f; // xOffset;
         this.yOffset = resources.getDimension(R.dimen.digital_y_offset);
 
-        this.textPaint = createTextPaint(resources.getColor(R.color.digital_text));
+        this.textPaint = createTextPaint(ContextCompat.getColor(ctx, R.color.digital_text));
+        this.ambientTextPaint = createTextPaint(ContextCompat.getColor(ctx, R.color.digital_text_ambient));
+
         dateFormatter = new SimpleDateFormat("EEE, MMM d yyyy");
+
+        Drawable defaultBackgroundMipmap = ctx.getDrawable(R.mipmap.ic_launcher);
+        defaultBackgroundIcon = ((BitmapDrawable) defaultBackgroundMipmap).getBitmap();
     }
 
     public void applyInsets(WindowInsets insets) {
-        boolean isRound = insets.isRound();
+        isRound = insets.isRound();
         Resources resources = ctx.getResources();
         xOffset = resources.getDimension(isRound
                 ? R.dimen.digital_x_offset_round : R.dimen.digital_x_offset);
@@ -49,45 +58,74 @@ public class SunshineSurfacePainter {
     }
 
     public void paint(boolean isAmbient, WeatherState weather, Canvas canvas, Rect bounds, GregorianCalendar time) {
+        xCenter = bounds.width() / 2.0f;
+
         drawBackground(isAmbient, canvas, bounds, weather.getBackgroundColor(), weather.getIcon());
 
         time.setTime(new java.util.Date());
 
-        drawTime(canvas, time);
-        float dateYOffset = drawDate(canvas, time);
-        drawWeather(canvas, dateYOffset, weather);
+        drawTime(getTextPaint(isAmbient), canvas, time);
+        float dateYOffset = drawDate(getTextPaint(isAmbient), canvas, time);
+        drawWeather(getTextPaint(isAmbient), canvas, dateYOffset, weather);
     }
 
-    private void drawTime(Canvas canvas, GregorianCalendar time) {
-        textPaint.setTextSize(timeTextSize);
+    private Paint getTextPaint(boolean isAmbient) {
+        return isAmbient ? ambientTextPaint : textPaint;
+    }
+
+    private float getStartForText(String text, Paint paint) {
+        if (isRound) {
+            Rect bounds = new Rect();
+            paint.getTextBounds(text, 0, text.length(), bounds);
+
+            return xCenter - (bounds.width() / 2.0f);
+        }
+        else {
+            return xOffset;
+        }
+    }
+
+    private void drawTime(Paint modeAdjustedTextPaint, Canvas canvas, GregorianCalendar time) {
+        modeAdjustedTextPaint.setTextSize(timeTextSize);
         String text = String.format("%d:%02d", getHour(time), time.get(GregorianCalendar.MINUTE));
-        canvas.drawText(text, xOffset, yOffset, textPaint);
+
+        canvas.drawText(text, getStartForText(text, modeAdjustedTextPaint), yOffset, modeAdjustedTextPaint);
     }
 
-    private float drawDate(Canvas canvas, GregorianCalendar time) {
-        textPaint.setTextSize(dateTextSize);
-        float dateYOffset = yOffset + textPaint.getFontSpacing();
-        canvas.drawText(dateFormatter.format(time.getTime()), xOffset, dateYOffset, textPaint);
+    private float drawDate(Paint modeAdjustedTextPaint, Canvas canvas, GregorianCalendar time) {
+        modeAdjustedTextPaint.setTextSize(dateTextSize);
+        float dateYOffset = yOffset + modeAdjustedTextPaint.getFontSpacing();
+        String text = dateFormatter.format(time.getTime());
+        canvas.drawText(text, getStartForText(text, modeAdjustedTextPaint), dateYOffset, modeAdjustedTextPaint);
         return dateYOffset;
     }
 
-    private void drawWeather(Canvas canvas, float dateYOffset, WeatherState weather) {
-        textPaint.setTextSize(weatherTextSize);
-        float weatherYOffset = dateYOffset + textPaint.getFontSpacing();
-        canvas.drawText(weather.getWeatherString(), xOffset, weatherYOffset, textPaint);
+    private void drawWeather(Paint modeAdjustedTextPaint, Canvas canvas, float dateYOffset, WeatherState weather) {
+        modeAdjustedTextPaint.setTextSize(weatherTextSize);
+        float weatherYOffset = dateYOffset + modeAdjustedTextPaint.getFontSpacing();
+        String text = weather.getWeatherString();
+        canvas.drawText(text, getStartForText(text, modeAdjustedTextPaint), weatherYOffset, modeAdjustedTextPaint);
     }
 
     private void drawBackground(boolean isAmbient, Canvas canvas, Rect bounds, Paint activeBackgroundPaint, Bitmap backgroundIcon) {
-
         if (isAmbient) {
             canvas.drawColor(Color.BLACK);
         } else {
             canvas.drawRect(0, 0, bounds.width(), bounds.height(), activeBackgroundPaint);
-            if (backgroundIcon != null) {
-                Log.i("SunshineWatchFace", "No background icon!");
-                Rect srcDest = new Rect(0, 0, backgroundIcon.getWidth(), backgroundIcon.getHeight());
-                canvas.drawBitmap(backgroundIcon, srcDest, bounds, activeBackgroundPaint);
+
+            if (backgroundIcon == null) {
+                backgroundIcon = defaultBackgroundIcon;
             }
+            Rect srcRect = new Rect(0, 0, backgroundIcon.getWidth(), backgroundIcon.getHeight());
+            Rect destRect = new Rect(bounds);
+
+            if (isRound) {
+                double diameter = bounds.width();
+                double transcribedSide = Math.sqrt((diameter*diameter) / 2.0);
+                int inset = (int) ((diameter - transcribedSide)/2.0);
+                destRect.inset(inset, inset);
+            }
+            canvas.drawBitmap(backgroundIcon, srcRect, destRect, activeBackgroundPaint);
         }
     }
 
